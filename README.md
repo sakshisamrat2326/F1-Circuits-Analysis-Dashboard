@@ -1,2 +1,12 @@
-# F1-Circuits-Analysis-Dashboard
-F1 Circuits Interactive Analysis DashboardThis project is an end-to-end data analysis of the Formula 1 circuits dataset. It includes a Jupyter Notebook for data exploration with Pandas and a single-page interactive web dashboard to present the findings.✨ Key FeaturesInteractive Dashboard: A live, responsive dashboard built with HTML, Tailwind CSS, and Chart.js.Data-Driven Insights: Visualizations for geographic hotspots and altitude challenges, revealing trends in F1 track locations.Dynamic Data Explorer: A searchable and sortable table to explore the entire circuits.csv dataset.F1-Themed UI/UX: A custom dark theme, CSS logo, and "starting lights" animation create an immersive experience.🛠️ Tech StackAnalysis: Python, Pandas, Jupyter NotebookDashboard: HTML, JavaScript, Tailwind CSS, Chart.jsDeployment: GitHub Pages🚀 Getting StartedView the Live DashboardThe best way to experience this project is through the live demo:https://sakshisamrat2326.github.io/F1-Circuits-Analysis-Dashboard/Run LocallyClone the repository:git clone https://github.com/sakshisamrat2326/F1-Circuits-Analysis-Dashboard.git
+# F1-Circuits-Interactive-Analysis-Dashboard
+
+This project analyzes the Formula 1 circuits dataset and presents the findings in a live, interactive web dashboard. It includes the full data analysis in a Jupyter Notebook and the deployed single-page application.
+
+🛠️ Tech Stack
+Analysis: Python, Pandas, Jupyter Notebook
+
+Dashboard: HTML, JavaScript, Tailwind CSS, Chart.js
+
+Deployment: GitHub Pages
+
+🚀 demo:https://sakshisamrat2326.github.io/F1-Circuits-Analysis-Dashboard/Run LocallyClone the repository:git clone https://github.com/sakshisamrat2326/F1-Circuits-Analysis-Dashboard.git

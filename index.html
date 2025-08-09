@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive F1 Circuits Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- 
+    Chosen Palette: Calm Neutral
+    Application Structure Plan: A single-page dashboard structure is used to present the analysis in a narrative flow. It starts with high-level summary statistics (Key Stats), then drills down into specific insights (Geographic Distribution, Altitude Extremes), and finally provides a tool for self-exploration (Data Explorer). This thematic sectioning guides the user through the story of the data, from a broad overview to fine details, making the information highly consumable. Navigation is handled by scrolling, which is intuitive for a single-page app.
+    Visualization & Content Choices: 
+    - Key Stats: Goal: Inform. Method: Dynamic counters in cards for immediate impact. Justification: Quickly conveys the scale of the data. Library: HTML/JS.
+    - Geographic Distribution: Goal: Compare. Method: Interactive Bar Chart. Justification: Best for comparing counts across countries. Interaction (hover) adds engagement. Library: Chart.js.
+    - Altitude Extremes: Goal: Inform/Compare. Method: Highlight cards for record-holders and a separate bar chart for national averages. Justification: Clearly distinguishes individual circuit records from country-level trends. Library: HTML/JS for cards, Chart.js for the chart.
+    - Data Explorer: Goal: Organize/Explore. Method: Searchable and sortable HTML table. Justification: Empowers users to perform their own analysis and find specific information. Library: Vanilla JS.
+    CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. 
+    -->
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* Tailwind slate-100 */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 40vh;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .stat-card {
+            background-color: #1e293b; /* slate-800 */
+            color: #f1f5f9; /* slate-100 */
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+            border: 1px solid #334155; /* slate-700 */
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.1);
+        }
+        th[data-sort] {
+            cursor: pointer;
+            position: relative;
+        }
+        th[data-sort]:after {
+            content: ' \2195';
+            opacity: 0.4;
+        }
+        .table-row-hover:hover {
+            background-color: #334155; /* slate-700 */
+        }
+        .sticky-nav {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(10px);
+            background-color: rgba(255, 255, 255, 0.8);
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .nav-link {
+            transition: color 0.3s, border-color 0.3s;
+        }
+        .nav-link.active {
+            color: #e11d48; /* rose-600 */
+            border-bottom-color: #e11d48;
+        }
+        .f1-logo {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .f1-logo .f-char {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #e11d48;
+            line-height: 1;
+        }
+        .f1-logo .one-stripes {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .f1-logo .stripe {
+            width: 50px;
+            height: 8px;
+            background-color: #e11d48;
+            transform: skewX(-25deg);
+        }
+        .start-light {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 9999px;
+            background-color: #3f3f46; /* zinc-700 */
+            transition: background-color 0.2s;
+        }
+        .start-light.on {
+            background-color: #ef4444; /* red-500 */
+            box-shadow: 0 0 15px 5px rgba(239, 68, 68, 0.7);
+        }
+        .checkered {
+            background-color: #1e293b;
+            background-image:
+                linear-gradient(45deg, #334155 25%, transparent 25%),
+                linear-gradient(-45deg, #334155 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #334155 75%),
+                linear-gradient(-45deg, transparent 75%, #334155 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        .driver-sticker {
+            position: relative;
+            background: #fff;
+            padding: 1.5rem 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            overflow: hidden;
+        }
+        .driver-sticker:hover {
+            transform: rotate(3deg) translateY(-10px);
+            box-shadow: 0 12px 20px rgba(0,0,0,0.2);
+        }
+        .driver-sticker::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 0 0 30px 30px;
+            border-color: transparent transparent #e2e8f0 transparent;
+            transition: border-width 0.3s ease;
+        }
+        .driver-sticker:hover::after {
+            border-width: 0 0 40px 40px;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <header class="bg-white shadow-sm py-4">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-center items-center flex-col">
+            <div class="f1-logo mb-2">
+                <div class="f-char">F</div>
+                <div class="one-stripes">
+                    <div class="stripe"></div>
+                    <div class="stripe"></div>
+                    <div class="stripe"></div>
+                </div>
+            </div>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900 text-center">Global Circuits Dashboard</h1>
+            <p class="text-gray-600 mt-1 max-w-2xl mx-auto text-center">An interactive analysis of the geography and altitude of F1 tracks worldwide.</p>
+        </div>
+    </header>
+    
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 my-4 flex justify-center items-center space-x-2">
+        <div class="start-light" id="light-1"></div>
+        <div class="start-light" id="light-2"></div>
+        <div class="start-light" id="light-3"></div>
+        <div class="start-light" id="light-4"></div>
+        <div class="start-light" id="light-5"></div>
+    </div>
+
+    <nav class="sticky-nav">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-center items-center h-16 space-x-4 sm:space-x-8">
+                <a href="#key-stats" class="nav-link text-gray-500 hover:text-rose-600 font-medium border-b-2 border-transparent pb-1">🏆 Stats</a>
+                <a href="#geo-distribution" class="nav-link text-gray-500 hover:text-rose-600 font-medium border-b-2 border-transparent pb-1">🌍 Geography</a>
+                <a href="#altitude-analysis" class="nav-link text-gray-500 hover:text-rose-600 font-medium border-b-2 border-transparent pb-1">⛰️ Altitude</a>
+                <a href="#driver-stickers" class="nav-link text-gray-500 hover:text-rose-600 font-medium border-b-2 border-transparent pb-1">⭐ Drivers</a>
+                <a href="#data-explorer" class="nav-link text-gray-500 hover:text-rose-600 font-medium border-b-2 border-transparent pb-1">🏎️ Explorer</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+
+        <section id="key-stats" class="mb-16 scroll-mt-24">
+             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="stat-card text-center">
+                    <h3 class="text-lg font-medium text-slate-400">Total Circuits</h3>
+                    <p id="total-circuits" class="text-4xl font-bold text-white mt-2">0</p>
+                </div>
+                <div class="stat-card text-center">
+                    <h3 class="text-lg font-medium text-slate-400">Total Countries</h3>
+                    <p id="total-countries" class="text-4xl font-bold text-white mt-2">0</p>
+                </div>
+                <div class="stat-card text-center">
+                    <h3 class="text-lg font-medium text-slate-400">Highest Altitude</h3>
+                    <p id="highest-alt" class="text-4xl font-bold text-white mt-2">0m</p>
+                    <p id="highest-alt-name" class="text-sm text-slate-400 mt-1">-</p>
+                </div>
+                <div class="stat-card text-center">
+                    <h3 class="text-lg font-medium text-slate-400">Lowest Altitude</h3>
+                    <p id="lowest-alt" class="text-4xl font-bold text-white mt-2">0m</p>
+                    <p id="lowest-alt-name" class="text-sm text-slate-400 mt-1">-</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="geo-distribution" class="bg-slate-800 p-6 rounded-lg shadow-lg mb-16 scroll-mt-24">
+            <h2 class="text-2xl font-bold mb-1 text-white">Geographic Hotspots</h2>
+            <p class="text-slate-400 mb-6">This chart highlights the countries that have hosted the most unique Formula 1 circuits. Hover over the bars to see the exact circuit count.</p>
+            <div class="chart-container">
+                <canvas id="countryChart"></canvas>
+            </div>
+        </section>
+
+        <section id="altitude-analysis" class="bg-slate-800 p-6 rounded-lg shadow-lg mb-16 scroll-mt-24">
+            <h2 class="text-2xl font-bold mb-1 text-white">The Altitude Challenge</h2>
+            <p class="text-slate-400 mb-6">Altitude significantly impacts car performance, affecting everything from engine power to aerodynamics. This section explores which countries offer the highest average racing altitude.</p>
+            <div class="chart-container">
+                <canvas id="altitudeChart"></canvas>
+            </div>
+        </section>
+        
+        <section id="driver-stickers" class="bg-slate-800 p-6 rounded-lg shadow-lg mb-16 scroll-mt-24">
+            <h2 class="text-2xl font-bold mb-1 text-white">F1 Legends & Stars</h2>
+            <p class="text-slate-400 mb-6">A collection of iconic drivers, past and present, who have left their mark on the sport.</p>
+            <div id="sticker-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                <!-- Driver stickers will be inserted here by JavaScript -->
+            </div>
+        </section>
+
+        <section id="data-explorer" class="bg-slate-800 p-6 rounded-lg shadow-lg scroll-mt-24">
+            <h2 class="text-2xl font-bold mb-1 text-white">Circuit Data Explorer</h2>
+            <p class="text-slate-400 mb-4">Dig deeper into the raw data. Use the search bar to filter by name or country, and click on the column headers to sort the data.</p>
+            <input type="text" id="searchInput" placeholder="Search circuits..." class="w-full p-2 border bg-slate-700 border-slate-600 text-white rounded-md mb-4 focus:ring-2 focus:ring-rose-500 focus:border-rose-500">
+            <div class="overflow-x-auto rounded-lg border border-slate-700">
+                <table class="min-w-full divide-y divide-slate-700">
+                    <thead class="bg-slate-900">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider" data-sort="name">Name</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider" data-sort="location">Location</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider" data-sort="country">Country</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider" data-sort="alt">Altitude (m)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="circuitTable" class="bg-slate-800 divide-y divide-slate-700">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <footer class="checkered mt-16 py-8">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-400">
+            <p>An interactive report generated from the F1 Circuits dataset.</p>
+        </div>
+    </footer>
+
+    <script>
+        const circuitData = [
+            { "circuitId": 1, "circuitRef": "albert_park", "name": "Albert Park Grand Prix Circuit", "location": "Melbourne", "country": "Australia", "lat": -37.8497, "lng": 144.968, "alt": 10 },
+            { "circuitId": 2, "circuitRef": "sepang", "name": "Sepang International Circuit", "location": "Kuala Lumpur", "country": "Malaysia", "lat": 2.76083, "lng": 101.738, "alt": 18 },
+            { "circuitId": 3, "circuitRef": "bahrain", "name": "Bahrain International Circuit", "location": "Sakhir", "country": "Bahrain", "lat": 26.0325, "lng": 50.5106, "alt": 7 },
+            { "circuitId": 4, "circuitRef": "catalunya", "name": "Circuit de Barcelona-Catalunya", "location": "Montmeló", "country": "Spain", "lat": 41.57, "lng": 2.26111, "alt": 109 },
+            { "circuitId": 5, "circuitRef": "istanbul", "name": "Istanbul Park", "location": "Istanbul", "country": "Turkey", "lat": 40.9517, "lng": 29.405, "alt": 130 },
+            { "circuitId": 6, "circuitRef": "monaco", "name": "Circuit de Monaco", "location": "Monte-Carlo", "country": "Monaco", "lat": 43.7347, "lng": 7.42056, "alt": 7 },
+            { "circuitId": 7, "circuitRef": "villeneuve", "name": "Circuit Gilles Villeneuve", "location": "Montreal", "country": "Canada", "lat": 45.5, "lng": -73.5228, "alt": 13 },
+            { "circuitId": 8, "circuitRef": "magny_cours", "name": "Circuit de Nevers Magny-Cours", "location": "Magny Cours", "country": "France", "lat": 46.8642, "lng": 3.16361, "alt": 228 },
+            { "circuitId": 9, "circuitRef": "silverstone", "name": "Silverstone Circuit", "location": "Silverstone", "country": "UK", "lat": 52.0786, "lng": -1.01694, "alt": 153 },
+            { "circuitId": 10, "circuitRef": "hockenheimring", "name": "Hockenheimring", "location": "Hockenheim", "country": "Germany", "lat": 49.3278, "lng": 8.565, "alt": 103 },
+            { "circuitId": 11, "circuitRef": "hungaroring", "name": "Hungaroring", "location": "Budapest", "country": "Hungary", "lat": 47.5789, "lng": 19.2486, "alt": 264 },
+            { "circuitId": 12, "circuitRef": "valencia", "name": "Valencia Street Circuit", "location": "Valencia", "country": "Spain", "lat": 39.4589, "lng": -0.331667, "alt": 4 },
+            { "circuitId": 13, "circuitRef": "spa", "name": "Circuit de Spa-Francorchamps", "location": "Spa", "country": "Belgium", "lat": 50.4372, "lng": 5.97139, "alt": 401 },
+            { "circuitId": 14, "circuitRef": "monza", "name": "Autodromo Nazionale di Monza", "location": "Monza", "country": "Italy", "lat": 45.6156, "lng": 9.28111, "alt": 162 },
+            { "circuitId": 15, "circuitRef": "marina_bay", "name": "Marina Bay Street Circuit", "location": "Marina Bay", "country": "Singapore", "lat": 1.2914, "lng": 103.864, "alt": 18 },
+            { "circuitId": 16, "circuitRef": "fuji", "name": "Fuji Speedway", "location": "Oyama", "country": "Japan", "lat": 35.3717, "lng": 138.927, "alt": 581 },
+            { "circuitId": 17, "circuitRef": "shanghai", "name": "Shanghai International Circuit", "location": "Shanghai", "country": "China", "lat": 31.3389, "lng": 121.22, "alt": 5 },
+            { "circuitId": 18, "circuitRef": "interlagos", "name": "Autódromo José Carlos Pace", "location": "São Paulo", "country": "Brazil", "lat": -23.7036, "lng": -46.6997, "alt": 785 },
+            { "circuitId": 19, "circuitRef": "indianapolis", "name": "Indianapolis Motor Speedway", "location": "Indianapolis", "country": "USA", "lat": 39.795, "lng": -86.2347, "alt": 223 },
+            { "circuitId": 20, "circuitRef": "nurburgring", "name": "Nürburgring", "location": "Nürburg", "country": "Germany", "lat": 50.3356, "lng": 6.9475, "alt": 578 },
+            { "circuitId": 21, "circuitRef": "imola", "name": "Autodromo Enzo e Dino Ferrari", "location": "Imola", "country": "Italy", "lat": 44.3439, "lng": 11.7167, "alt": 37 },
+            { "circuitId": 22, "circuitRef": "suzuka", "name": "Suzuka Circuit", "location": "Suzuka", "country": "Japan", "lat": 34.8431, "lng": 136.541, "alt": 45 },
+            { "circuitId": 24, "circuitRef": "yas_marina", "name": "Yas Marina Circuit", "location": "Abu Dhabi", "country": "UAE", "lat": 24.4672, "lng": 54.6031, "alt": 3 },
+            { "circuitId": 25, "circuitRef": "galvez", "name": "Autódromo Juan y Óscar Gálvez", "location": "Buenos Aires", "country": "Argentina", "lat": -34.6943, "lng": -58.4593, "alt": 8 },
+            { "circuitId": 26, "circuitRef": "jerez", "name": "Circuito de Jerez", "location": "Jerez de la Frontera", "country": "Spain", "lat": 36.7083, "lng": -6.03417, "alt": 37 },
+            { "circuitId": 27, "circuitRef": "estoril", "name": "Autódromo do Estoril", "location": "Estoril", "country": "Portugal", "lat": 38.7506, "lng": -9.39417, "alt": 138 },
+            { "circuitId": 28, "circuitRef": "okayama", "name": "Okayama International Circuit", "location": "Aida", "country": "Japan", "lat": 34.915, "lng": 134.221, "alt": 251 },
+            { "circuitId": 29, "circuitRef": "adelaide", "name": "Adelaide Street Circuit", "location": "Adelaide", "country": "Australia", "lat": -34.9272, "lng": 138.617, "alt": 5 },
+            { "circuitId": 30, "circuitRef": "kyalami", "name": "Kyalami", "location": "Midrand", "country": "South Africa", "lat": -25.9994, "lng": 28.0736, "alt": 1491 },
+            { "circuitId": 31, "circuitRef": "rodriguez", "name": "Autódromo Hermanos Rodríguez", "location": "Mexico City", "country": "Mexico", "lat": 19.4042, "lng": -99.0907, "alt": 2227 },
+            { "circuitId": 32, "circuitRef": "brands_hatch", "name": "Brands Hatch", "location": "Kent", "country": "UK", "lat": 51.3569, "lng": 0.263056, "alt": 145 },
+            { "circuitId": 34, "circuitRef": "zandvoort", "name": "Circuit Park Zandvoort", "location": "Zandvoort", "country": "Netherlands", "lat": 52.3888, "lng": 4.54092, "alt": 6 },
+            { "circuitId": 35, "circuitRef": "zolder", "name": "Zolder", "location": "Heusden-Zolder", "country": "Belgium", "lat": 50.9894, "lng": 5.25694, "alt": 45 },
+            { "circuitId": 36, "circuitRef": "dijon", "name": "Dijon-Prenois", "location": "Dijon", "country": "France", "lat": 47.3625, "lng": 4.89917, "alt": 478 },
+            { "circuitId": 37, "circuitRef": "jarama", "name": "Jarama", "location": "Madrid", "country": "Spain", "lat": 40.6171, "lng": -3.58558, "alt": 608 },
+            { "circuitId": 38, "circuitRef": "watkins_glen", "name": "Watkins Glen", "location": "New York State", "country": "USA", "lat": 42.3369, "lng": -76.9272, "alt": 401 },
+            { "circuitId": 39, "circuitRef": "anderstorp", "name": "Scandinavian Raceway", "location": "Anderstorp", "country": "Sweden", "lat": 57.2653, "lng": 13.6042, "alt": 154 },
+            { "circuitId": 40, "circuitRef": "mosport", "name": "Mosport International Raceway", "location": "Ontario", "country": "Canada", "lat": 44.0481, "lng": -78.6756, "alt": 342 },
+            { "circuitId": 41, "circuitRef": "montjuic", "name": "Montjuïc", "location": "Barcelona", "country": "Spain", "lat": 41.3664, "lng": 2.15167, "alt": 69 },
+            { "circuitId": 42, "circuitRef": "nivelles", "name": "Nivelles-Baulers", "location": "Nivelles", "country": "Belgium", "lat": 50.6211, "lng": 4.32694, "alt": 154 },
+            { "circuitId": 43, "circuitRef": "charade", "name": "Charade Circuit", "location": "Clermont-Ferrand", "country": "France", "lat": 45.7472, "lng": 3.015, "alt": 784 },
+            { "circuitId": 44, "circuitRef": "tremblant", "name": "Circuit Mont-Tremblant", "location": "Quebec", "country": "Canada", "lat": 46.2111, "lng": -74.5919, "alt": 298 },
+            { "circuitId": 45, "circuitRef": "essarts", "name": "Rouen-Les-Essarts", "location": "Rouen", "country": "France", "lat": 49.3306, "lng": 1.00417, "alt": 152 },
+            { "circuitId": 46, "circuitRef": "zeltweg", "name": "Zeltweg Airfield", "location": "Zeltweg", "country": "Austria", "lat": 47.2039, "lng": 14.7475, "alt": 696 },
+            { "circuitId": 47, "circuitRef": "aintree", "name": "Aintree", "location": "Liverpool", "country": "UK", "lat": 53.4769, "lng": -2.94056, "alt": 14 },
+            { "circuitId": 48, "circuitRef": "boavista", "name": "Circuito da Boavista", "location": "Oporto", "country": "Portugal", "lat": 41.1705, "lng": -8.65519, "alt": 31 },
+            { "circuitId": 49, "circuitRef": "reims", "name": "Reims-Gueux", "location": "Reims", "country": "France", "lat": 49.2542, "lng": 3.93083, "alt": 88 },
+            { "circuitId": 50, "circuitRef": "avus", "name": "AVUS", "location": "Berlin", "country": "Germany", "lat": 52.4806, "lng": 13.2514, "alt": 51 },
+            { "circuitId": 51, "circuitRef": "monsanto", "name": "Monsanto Park Circuit", "location": "Lisbon", "country": "Portugal", "lat": 38.7194, "lng": -9.20306, "alt": 158 },
+            { "circuitId": 52, "circuitRef": "riverside", "name": "Riverside International Raceway", "location": "California", "country": "USA", "lat": 33.937, "lng": -117.273, "alt": 472 },
+            { "circuitId": 53, "circuitRef": "sebring", "name": "Sebring International Raceway", "location": "Florida", "country": "USA", "lat": 27.4547, "lng": -81.3483, "alt": 18 },
+            { "circuitId": 54, "circuitRef": "ain-diab", "name": "Ain-Diab Circuit", "location": "Casablanca", "country": "Morocco", "lat": 33.5786, "lng": -7.6875, "alt": 19 },
+            { "circuitId": 55, "circuitRef": "pescara", "name": "Pescara Circuit", "location": "Pescara", "country": "Italy", "lat": 42.475, "lng": 14.1508, "alt": 18 },
+            { "circuitId": 56, "circuitRef": "bremgarten", "name": "Circuit Bremgarten", "location": "Bern", "country": "Switzerland", "lat": 46.9589, "lng": 7.40194, "alt": 510 },
+            { "circuitId": 57, "circuitRef": "pedralbes", "name": "Circuit de Pedralbes", "location": "Barcelona", "country": "Spain", "lat": 41.3903, "lng": 2.11667, "alt": 85 },
+            { "circuitId": 68, "circuitRef": "buddh", "name": "Buddh International Circuit", "location": "Uttar Pradesh", "country": "India", "lat": 28.3487, "lng": 77.5331, "alt": 194 },
+            { "circuitId": 69, "circuitRef": "americas", "name": "Circuit of the Americas", "location": "Austin", "country": "USA", "lat": 30.1328, "lng": -97.6411, "alt": 161 },
+            { "circuitId": 70, "circuitRef": "red_bull_ring", "name": "Red Bull Ring", "location": "Spielberg", "country": "Austria", "lat": 47.2197, "lng": 14.7647, "alt": 678 },
+            { "circuitId": 71, "circuitRef": "sochi", "name": "Sochi Autodrom", "location": "Sochi", "country": "Russia", "lat": 43.4057, "lng": 39.9578, "alt": 2 },
+            { "circuitId": 73, "circuitRef": "baku", "name": "Baku City Circuit", "location": "Baku", "country": "Azerbaijan", "lat": 40.3725, "lng": 49.8533, "alt": -7 },
+            { "circuitId": 75, "circuitRef": "portimao", "name": "Autódromo Internacional do Algarve", "location": "Portimão", "country": "Portugal", "lat": 37.227, "lng": -8.6267, "alt": 108 },
+            { "circuitId": 76, "circuitRef": "mugello", "name": "Mugello Circuit", "location": "Mugello", "country": "Italy", "lat": 43.9975, "lng": 11.3719, "alt": 255 },
+            { "circuitId": 77, "circuitRef": "jeddah", "name": "Jeddah Corniche Circuit", "location": "Jeddah", "country": "Saudi Arabia", "lat": 21.6319, "lng": 39.1044, "alt": 15 },
+            { "circuitId": 78, "circuitRef": "losail", "name": "Losail International Circuit", "location": "Al Daayen", "country": "Qatar", "lat": 25.49, "lng": 51.4542, "alt": 12 },
+            { "circuitId": 79, "circuitRef": "miami", "name": "Miami International Autodrome", "location": "Miami", "country": "USA", "lat": 25.9581, "lng": -80.2389, "alt": 4 }
+        ];
+
+        const driverData = [
+            { name: 'Lewis Hamilton', number: 44, country: '🇬🇧' },
+            { name: 'Max Verstappen', number: 1, country: '🇳🇱' },
+            { name: 'Charles Leclerc', number: 16, country: '🇲🇨' },
+            { name: 'Lando Norris', number: 4, country: '🇬🇧' },
+            { name: 'Ayrton Senna', number: 12, country: '🇧🇷' },
+            { name: 'Michael Schumacher', number: 5, country: '🇩🇪' },
+            { name: 'Fernando Alonso', number: 14, country: '🇪🇸' },
+            { name: 'Kimi Räikkönen', number: 7, country: '🇫🇮' },
+            { name: 'Sebastian Vettel', number: 5, country: '🇩🇪' },
+            { name: 'Daniel Ricciardo', number: 3, country: '🇦🇺' },
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            let sortDirection = {};
+            let currentChart1, currentChart2;
+
+            function animateValue(obj, start, end, duration) {
+                let startTimestamp = null;
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    obj.innerHTML = Math.floor(progress * (end - start) + start).toLocaleString();
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    }
+                };
+                window.requestAnimationFrame(step);
+            }
+
+            function setupStatAnimations() {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const totalCircuits = document.getElementById('total-circuits');
+                            const totalCountries = document.getElementById('total-countries');
+                            const highestAlt = document.getElementById('highest-alt');
+                            const lowestAlt = document.getElementById('lowest-alt');
+                            
+                            animateValue(totalCircuits, 0, circuitData.length, 1500);
+                            animateValue(totalCountries, 0, new Set(circuitData.map(c => c.country)).size, 1500);
+
+                            const highest = circuitData.reduce((p, c) => (p.alt || 0) > (c.alt || 0) ? p : c);
+                            const lowest = circuitData.reduce((p, c) => (p.alt || 0) < (c.alt || 0) ? p : c);
+
+                            animateValue(highestAlt, 0, highest.alt, 1500);
+                            highestAlt.innerHTML += 'm';
+                            document.getElementById('highest-alt-name').textContent = highest.name;
+                            
+                            animateValue(lowestAlt, 0, lowest.alt, 1500);
+                            lowestAlt.innerHTML += 'm';
+                            document.getElementById('lowest-alt-name').textContent = lowest.name;
+
+                            observer.unobserve(entry.target);
+                        }
+                    });
+                }, { threshold: 0.5 });
+
+                observer.observe(document.getElementById('key-stats'));
+            }
+            
+            function startLightsAnimation() {
+                const lights = document.querySelectorAll('.start-light');
+                lights.forEach((light, index) => {
+                    setTimeout(() => {
+                        light.classList.add('on');
+                    }, (index + 1) * 500);
+                });
+                setTimeout(() => {
+                     lights.forEach(light => light.classList.remove('on'));
+                }, (lights.length + 1) * 500);
+            }
+
+            function setupNavScrollSpy() {
+                const sections = document.querySelectorAll('main section');
+                const navLinks = document.querySelectorAll('.nav-link');
+
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            navLinks.forEach(link => {
+                                link.classList.toggle('active', link.getAttribute('href').substring(1) === entry.target.id);
+                            });
+                        }
+                    });
+                }, { rootMargin: '-50% 0px -50% 0px' });
+
+                sections.forEach(section => observer.observe(section));
+            }
+            
+            function createGradient(context, color1, color2) {
+                const chart = context.chart;
+                const {ctx, chartArea} = chart;
+                if (!chartArea) {
+                  return null;
+                }
+                const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                gradient.addColorStop(0, color1);
+                gradient.addColorStop(1, color2);
+                return gradient;
+            }
+
+            function renderCountryChart() {
+                const ctx = document.getElementById('countryChart').getContext('2d');
+                const countryCounts = circuitData.reduce((acc, circuit) => {
+                    acc[circuit.country] = (acc[circuit.country] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const sortedCountries = Object.entries(countryCounts).sort(([, a], [, b]) => b - a).slice(0, 10);
+                const labels = sortedCountries.map(entry => entry[0]);
+                const data = sortedCountries.map(entry => entry[1]);
+
+                if (currentChart1) currentChart1.destroy();
+                currentChart1 = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Number of Circuits',
+                            data: data,
+                            backgroundColor: (context) => createGradient(context, 'rgba(225, 29, 72, 0.6)', 'rgba(251, 113, 133, 0.8)'),
+                            borderColor: 'rgba(225, 29, 72, 1)',
+                            borderRadius: 4,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { 
+                            y: { beginAtZero: true, grace: '5%', grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#cbd5e1'} }, 
+                            x: { ticks: { autoSkip: false, maxRotation: 45, minRotation: 45, color: '#cbd5e1' }, grid: { display: false } } 
+                        },
+                        plugins: { legend: { display: false }, title: { display: false } }
+                    }
+                });
+            }
+
+            function renderAltitudeChart() {
+                const ctx = document.getElementById('altitudeChart').getContext('2d');
+                const countryAlts = circuitData.reduce((acc, c) => {
+                    if (!acc[c.country]) acc[c.country] = { totalAlt: 0, count: 0 };
+                    if (c.alt !== null) { acc[c.country].totalAlt += c.alt; acc[c.country].count++; }
+                    return acc;
+                }, {});
+                const avgAlts = Object.entries(countryAlts).map(([country, data]) => ({ country, avgAlt: data.count > 0 ? data.totalAlt / data.count : 0 }));
+                const sortedAvgAlts = avgAlts.sort((a, b) => b.avgAlt - a.avgAlt).slice(0, 10);
+                const labels = sortedAvgAlts.map(d => d.country);
+                const data = sortedAvgAlts.map(d => d.avgAlt.toFixed(0));
+
+                if (currentChart2) currentChart2.destroy();
+                currentChart2 = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Average Altitude (m)',
+                            data: data,
+                            backgroundColor: (context) => createGradient(context, 'rgba(79, 70, 229, 0.6)', 'rgba(129, 140, 248, 0.8)'),
+                            borderColor: 'rgba(79, 70, 229, 1)',
+                            borderRadius: 4,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { 
+                            y: { beginAtZero: true, grace: '5%', grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#cbd5e1'} }, 
+                            x: { ticks: { autoSkip: false, maxRotation: 45, minRotation: 45, color: '#cbd5e1' }, grid: { display: false } } 
+                        },
+                        plugins: { legend: { display: false }, title: { display: false } }
+                    }
+                });
+            }
+            
+            function renderDriverStickers() {
+                const grid = document.getElementById('sticker-grid');
+                driverData.forEach(driver => {
+                    const sticker = document.createElement('div');
+                    sticker.className = 'driver-sticker';
+                    sticker.innerHTML = `
+                        <div class="text-4xl font-bold text-slate-700">${driver.number}</div>
+                        <div class="mt-2 text-sm font-semibold text-slate-800">${driver.name}</div>
+                        <div class="mt-1 text-2xl">${driver.country}</div>
+                    `;
+                    grid.appendChild(sticker);
+                });
+            }
+
+            function renderTable(data) {
+                const tableBody = document.getElementById('circuitTable');
+                tableBody.innerHTML = '';
+                data.forEach(circuit => {
+                    const row = document.createElement('tr');
+                    row.className = 'table-row-hover';
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">${circuit.name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400">${circuit.location}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400">${circuit.country}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400">${circuit.alt !== null ? circuit.alt : 'N/A'}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const filteredData = circuitData.filter(c =>
+                    c.name.toLowerCase().includes(searchTerm) ||
+                    c.location.toLowerCase().includes(searchTerm) ||
+                    c.country.toLowerCase().includes(searchTerm)
+                );
+                renderTable(filteredData);
+            });
+
+            document.querySelectorAll('th[data-sort]').forEach(header => {
+                header.addEventListener('click', () => {
+                    const column = header.dataset.sort;
+                    sortDirection[column] = sortDirection[column] === 'asc' ? 'desc' : 'asc';
+                    const sortedData = [...circuitData].sort((a, b) => {
+                        let valA = a[column], valB = b[column];
+                        if (typeof valA === 'string') { valA = valA.toLowerCase(); valB = valB.toLowerCase(); }
+                        if (valA < valB) return sortDirection[column] === 'asc' ? -1 : 1;
+                        if (valA > valB) return sortDirection[column] === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                    renderTable(sortedData);
+                });
+            });
+
+            function init() {
+                startLightsAnimation();
+                setupStatAnimations();
+                renderCountryChart();
+                renderAltitudeChart();
+                renderDriverStickers();
+                renderTable(circuitData);
+                setupNavScrollSpy();
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>

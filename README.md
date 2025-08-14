@@ -9,4 +9,4 @@ Dashboard: HTML, JavaScript, Tailwind CSS, Chart.js
 
 Deployment: GitHub Pages
 
-🚀 demo:https://sakshisamrat2326.github.io/F1-Circuits-Analysis-Dashboard/Run LocallyClone the repository:git clone https://github.com/sakshisamrat2326/F1-Circuits-Analysis-Dashboard.git
+🚀 demo:https://sakshisamrat2326.github.io/F1-Circuits-Analysis-Dashboard/ 
